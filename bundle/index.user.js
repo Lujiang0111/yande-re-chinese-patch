@@ -705,7 +705,7 @@ div#paginator > div.pagination {
   };
   const origin = window.location.origin;
   let taskArray = [];
-  let maxLoadingSampleNum = 4;
+  let maxLoadingSampleNum = 1;
   let doLoadSampleUrl = () => {
     let loadingNum = 0;
     let loadSampleUrl = () => {
@@ -762,7 +762,7 @@ div#paginator > div.pagination {
               taskArray.push({ element, sampleUrl });
               break;
             default:
-              element.src = sampleUrl;
+              taskArray.push({ element, sampleUrl });
               break;
           }
         }
