@@ -1,22 +1,19 @@
 // ==UserScript==
 // @name         Yande.re 简体中文
 // @namespace    com.coderzhaoziwei.yandere
-// @version      2.0.75
+// @version      2.1.28
 // @author       Coder Zhao coderzhaoziwei@outlook.com
 // @description  中文标签 | 界面优化 | 高清大图 | 键盘翻页 | 流体布局
-// @modified     2021/10/24 11:15:21
 // @homepage     https://greasyfork.org/scripts/421970
 // @license      MIT
 // @match        https://yande.re/*
 // @exclude      https://yande.re/forum/*
-// @match        https://oreno.imouto.us/*
-// @exclude      https://oreno.imouto.us/forum/*
 // @match        https://konachan.com/*
 // @exclude      https://konachan.com/forum/*
 // @match        https://konachan.net/*
 // @exclude      https://konachan.net/forum/*
 // @supportURL   https://github.com/coderzhaoziwei/yande-re-chinese-patch/issues
-// @grant        none
+// @grant        GM_download
 // ==/UserScript==
 
 /* eslint-env es6 */
@@ -97,6 +94,7 @@
       this.previewUrl = data.preview_url;
       this.previewWidth = data.actual_preview_width || 0;
       this.previewHeight = data.actual_preview_height || 0;
+      this.favorite = false;
     }
     get isRatingS() {
       return this.rating === "s"
@@ -179,28 +177,9 @@
         requestStop: false,
         innerWidth: window.innerWidth,
         innerHeight: window.innerHeight,
-        columnCount: {
-          300: 1,
-          450: 2,
-          600: 3,
-          750: 4,
-          900: 5,
-          1050: 6,
-          1200: 7,
-          1350: 8,
-          1500: 9,
-          1650: 10,
-          1800: 11,
-          1950: 12,
-          2100: 13,
-          2250: 14,
-          2400: 15,
-          2550: 16,
-          2700: 17,
-          2850: 18,
-          3000: 19,
-          default: 20,
-        },
+        imageCountInRow: JSON.parse(localStorage.getItem("imageCountInRow") || "3"),
+        imageQualityHigh: JSON.parse(localStorage.getItem("imageQualityHigh") || "false"),
+        showFavoriteSuccess: false,
       }
     },
     computed: {
@@ -233,6 +212,15 @@
       showRatingE(value) {
         localStorage.setItem("showRatingE", JSON.stringify(value));
       },
+      imageCountInRow(value) {
+        localStorage.setItem("imageCountInRow", JSON.stringify(value));
+      },
+      imageQualityHigh(value) {
+        localStorage.setItem("imageQualityHigh", JSON.stringify(value));
+      },
+      showFavoriteSuccess(value) {
+        console.log('showFavoriteSuccess: ', value);
+      },
     },
     methods: {
       async request() {
@@ -251,19 +239,19 @@
           this.requestStop = true;
         }
       },
-      download(url, filename) {
-        console.log(url);
-        jQuery.ajax({
-          url,
-          xhrFields:{
-            responseType: "blob",
-          },
-          success(data) {
-            const element = document.createElement("a");
-            element.href = URL.createObjectURL(data);
-            element.download = filename;
-            const event = new MouseEvent("click");
-            element.dispatchEvent(event);
+      download(src, filename) {
+        GM_download(src, filename);
+      },
+      onFavorite(id) {
+        $.ajax({
+          method: 'POST',
+          url: "https://yande.re/post/vote.json",
+          beforeSend: xhr => xhr.setRequestHeader('x-csrf-token', window.csrfToken),
+          data: { id, score: 3 },
+          success: data => {
+            if (data.success === true) {
+              this.imageList[this.imageSelectedIndex].favorite = true;
+            }
           },
         });
       },
@@ -298,6 +286,7 @@
     await getScript("https://cdn.jsdelivr.net/npm/vuetify@2.5.0/dist/vuetify.min.js");
     await getScript("https://cdn.jsdelivr.net/npm/vue-masonry-css@1.0.3/dist/vue-masonry.min.js");
     await getScript("https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js");
+    window.csrfToken = jQuery('[name="csrf-token"]').attr('content');
     document.head.innerHTML = `[{ path: "source/html/head.html" }]`;
     document.body.innerHTML = `[{ path: "source/html/body.html" }]`;
     Vue.use(VueMasonry);
@@ -330,7 +319,6 @@
     localStorage.setItem("showImageHD", JSON.stringify(index));
     console.log("showImageHD", index);
   };
-  const origin = window.location.origin;
   let taskArray = [];
   let maxLoadingSampleNum = 4;
   let doLoadSampleUrl = () => {
@@ -366,14 +354,7 @@
         const id = RegExp.$1;
         const sampleUrl = samples[id];
         if (sampleUrl !== undefined) {
-          switch (origin) {
-            case 'https://oreno.imouto.us':
-              taskArray.push({ element, sampleUrl });
-              break;
-            default:
-              element.src = sampleUrl;
-              break;
-          }
+          element.src = sampleUrl;
         }
       }
     });
