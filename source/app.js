@@ -21,29 +21,10 @@ const App = {
       innerWidth: window.innerWidth,
       innerHeight: window.innerHeight,
 
-      // :cols="{ default: 16, 2100: 14, 1800: 12, 1500: 10, 1200: 8, 900: 6, 600: 4, 300: 2 }"
-      columnCount: {
-        300: 1,
-        450: 2,
-        600: 3,
-        750: 4,
-        900: 5,
-        1050: 6,
-        1200: 7,
-        1350: 8,
-        1500: 9,
-        1650: 10,
-        1800: 11,
-        1950: 12,
-        2100: 13,
-        2250: 14,
-        2400: 15,
-        2550: 16,
-        2700: 17,
-        2850: 18,
-        3000: 19,
-        default: 20,
-      },
+      imageCountInRow: JSON.parse(localStorage.getItem("imageCountInRow") || "3"),
+      imageQualityHigh: JSON.parse(localStorage.getItem("imageQualityHigh") || "false"),
+
+      showFavoriteSuccess: false,
     }
   },
   computed: {
@@ -76,6 +57,15 @@ const App = {
     showRatingE(value) {
       localStorage.setItem("showRatingE", JSON.stringify(value))
     },
+    imageCountInRow(value) {
+      localStorage.setItem("imageCountInRow", JSON.stringify(value))
+    },
+    imageQualityHigh(value) {
+      localStorage.setItem("imageQualityHigh", JSON.stringify(value))
+    },
+    showFavoriteSuccess(value) {
+      console.log('showFavoriteSuccess: ', value)
+    },
   },
   methods: {
     async request() {
@@ -95,26 +85,23 @@ const App = {
         this.requestStop = true
       }
     },
-    download(url, filename) {
-      console.log(url)
-
-      jQuery.ajax({
-        url,
-        xhrFields:{
-          responseType: "blob",
-        },
-        success(data) {
-          const element = document.createElement("a")
-          element.href = URL.createObjectURL(data)
-          element.download = filename
-          const event = new MouseEvent("click")
-          element.dispatchEvent(event)
+    download(src, filename) {
+      GM_download(src, filename)
+    },
+    // 添加收藏
+    onFavorite(id) {
+      $.ajax({
+        method: 'POST',
+        url: "https://yande.re/post/vote.json",
+        beforeSend: xhr => xhr.setRequestHeader('x-csrf-token', window.csrfToken),
+        data: { id, score: 3 },
+        success: data => {
+          if (data.success === true) {
+            this.imageList[this.imageSelectedIndex].favorite = true // 更新收藏状态
+          }
         },
       })
     },
-    // play() {
-    //   this.imageSelectedIndex ++
-    // },
   },
   mounted() {
     // 自动加载数据

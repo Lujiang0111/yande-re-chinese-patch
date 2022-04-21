@@ -1,22 +1,19 @@
 // ==UserScript==
 // @name         Yande.re 简体中文
 // @namespace    com.coderzhaoziwei.yandere
-// @version      2.0.75
+// @version      2.1.28
 // @author       Coder Zhao coderzhaoziwei@outlook.com
 // @description  中文标签 | 界面优化 | 高清大图 | 键盘翻页 | 流体布局
-// @modified     2021/10/24 11:15:21
 // @homepage     https://greasyfork.org/scripts/421970
 // @license      MIT
 // @match        https://yande.re/*
 // @exclude      https://yande.re/forum/*
-// @match        https://oreno.imouto.us/*
-// @exclude      https://oreno.imouto.us/forum/*
 // @match        https://konachan.com/*
 // @exclude      https://konachan.com/forum/*
 // @match        https://konachan.net/*
 // @exclude      https://konachan.net/forum/*
 // @supportURL   https://github.com/coderzhaoziwei/yande-re-chinese-patch/issues
-// @grant        none
+// @grant        GM_download
 // ==/UserScript==
 
 /* eslint-env es6 */
@@ -254,6 +251,7 @@ div#paginator > div.pagination {
       this.previewUrl = data.preview_url;
       this.previewWidth = data.actual_preview_width || 0;
       this.previewHeight = data.actual_preview_height || 0;
+      this.favorite = false;
     }
     get isRatingS() {
       return this.rating === "s"
@@ -336,28 +334,9 @@ div#paginator > div.pagination {
         requestStop: false,
         innerWidth: window.innerWidth,
         innerHeight: window.innerHeight,
-        columnCount: {
-          300: 1,
-          450: 2,
-          600: 3,
-          750: 4,
-          900: 5,
-          1050: 6,
-          1200: 7,
-          1350: 8,
-          1500: 9,
-          1650: 10,
-          1800: 11,
-          1950: 12,
-          2100: 13,
-          2250: 14,
-          2400: 15,
-          2550: 16,
-          2700: 17,
-          2850: 18,
-          3000: 19,
-          default: 20,
-        },
+        imageCountInRow: JSON.parse(localStorage.getItem("imageCountInRow") || "3"),
+        imageQualityHigh: JSON.parse(localStorage.getItem("imageQualityHigh") || "false"),
+        showFavoriteSuccess: false,
       }
     },
     computed: {
@@ -390,6 +369,15 @@ div#paginator > div.pagination {
       showRatingE(value) {
         localStorage.setItem("showRatingE", JSON.stringify(value));
       },
+      imageCountInRow(value) {
+        localStorage.setItem("imageCountInRow", JSON.stringify(value));
+      },
+      imageQualityHigh(value) {
+        localStorage.setItem("imageQualityHigh", JSON.stringify(value));
+      },
+      showFavoriteSuccess(value) {
+        console.log('showFavoriteSuccess: ', value);
+      },
     },
     methods: {
       async request() {
@@ -408,19 +396,19 @@ div#paginator > div.pagination {
           this.requestStop = true;
         }
       },
-      download(url, filename) {
-        console.log(url);
-        jQuery.ajax({
-          url,
-          xhrFields:{
-            responseType: "blob",
-          },
-          success(data) {
-            const element = document.createElement("a");
-            element.href = URL.createObjectURL(data);
-            element.download = filename;
-            const event = new MouseEvent("click");
-            element.dispatchEvent(event);
+      download(src, filename) {
+        GM_download(src, filename);
+      },
+      onFavorite(id) {
+        $.ajax({
+          method: 'POST',
+          url: "https://yande.re/post/vote.json",
+          beforeSend: xhr => xhr.setRequestHeader('x-csrf-token', window.csrfToken),
+          data: { id, score: 3 },
+          success: data => {
+            if (data.success === true) {
+              this.imageList[this.imageSelectedIndex].favorite = true;
+            }
           },
         });
       },
@@ -455,6 +443,7 @@ div#paginator > div.pagination {
     await getScript("https://cdn.jsdelivr.net/npm/vuetify@2.5.0/dist/vuetify.min.js");
     await getScript("https://cdn.jsdelivr.net/npm/vue-masonry-css@1.0.3/dist/vue-masonry.min.js");
     await getScript("https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js");
+    window.csrfToken = jQuery('[name="csrf-token"]').attr('content');
     document.head.innerHTML = `
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
@@ -479,6 +468,58 @@ div#paginator > div.pagination {
   <v-app-bar app dense>
     <v-app-bar-nav-icon @click="showDrawer=!showDrawer"></v-app-bar-nav-icon>
     <v-toolbar-title v-text="title"></v-toolbar-title>
+    <!-- 设置分级制度 -->
+    <v-menu offset-y>
+      <template v-slot:activator="{ on, attrs }">
+        <v-btn class="white--text ml-2" dark v-bind="attrs" v-on="on">
+          S{{ showRatingQ ? 'Q' : '' }}{{ showRatingE ? 'E' : '' }}
+        </v-btn>
+      </template>
+      <v-list dense>
+        <v-list-item>
+          <v-list-item-title style="cursor: pointer;" @click="showRatingQ = !showRatingQ;">
+            {{ showRatingQ ? '隐藏 Q 级内容' : '显示 Q 级内容' }}
+          </v-list-item-title>
+        </v-list-item>
+        <v-list-item>
+          <v-list-item-title style="cursor: pointer;" @click="showRatingE = !showRatingE;">
+            {{ showRatingE ? '隐藏 E 级内容' : '显示 E 级内容' }}
+          </v-list-item-title>
+        </v-list-item>
+      </v-list>
+    </v-menu>
+    <!-- 设置图片质量 -->
+    <v-menu offset-y>
+      <template v-slot:activator="{ on, attrs }">
+        <v-btn class="white--text ml-2" dark v-bind="attrs" v-on="on">{{ imageQualityHigh ? '高清' : '速览' }}</v-btn>
+      </template>
+      <v-list dense>
+        <v-list-item>
+          <v-list-item-title style="cursor: pointer;" @click="imageQualityHigh = false;">
+            图片质量：速览
+          </v-list-item-title>
+        </v-list-item>
+        <v-list-item>
+          <v-list-item-title style="cursor: pointer;" @click="imageQualityHigh = true;">
+            图片质量：高清
+          </v-list-item-title>
+        </v-list-item>
+      </v-list>
+    </v-menu>
+    <!-- 设置每行几张 -->
+    <v-menu offset-y>
+      <template v-slot:activator="{ on, attrs }">
+        <v-btn class="white--text ml-2" dark v-bind="attrs" v-on="on">每行 {{imageCountInRow}} 张</v-btn>
+      </template>
+      <v-list dense>
+        <v-list-item v-for="number in [1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 20]" :key="number">
+          <v-list-item-title style="cursor: pointer;" @click="imageCountInRow = number;">
+            每行 {{ number }} 张
+          </v-list-item-title>
+        </v-list-item>
+      </v-list>
+    </v-menu>
+
     <v-spacer></v-spacer>
     <v-btn text v-text="'version ' + version" color="#ffffff" disabled></v-btn>
   </v-app-bar>
@@ -577,13 +618,16 @@ div#paginator > div.pagination {
 
   <v-main app>
     <v-container class="pa-2" fluid>
-      <masonry :cols="columnCount" gutter="8px">
+      <masonry ref="masonry" :cols="imageCountInRow" gutter="8px" :key="imageCountInRow">
         <v-card class="mb-2" v-for="(image, index) in imageList" :key="index">
           <v-img
-            :src="image.isRatingS||(image.isRatingQ && showRatingQ)||(image.isRatingE && showRatingE)?image.previewUrl:''"
+            :src="
+              image.isRatingS || (image.isRatingQ && showRatingQ) || (image.isRatingE && showRatingE)
+                ? (imageQualityHigh ? image.sampleUrl : image.previewUrl) : ''
+            "
             :aspect-ratio="image.aspectRatio"
             @click="if(image.isRatingS||(image.isRatingQ && showRatingQ)||(image.isRatingE && showRatingE)){imageSelectedIndex=index;showImageSelected=true;}"
-            @click.middle="imageSelectedIndex=index;window.open('/post/show/' + imageSelected.id)"
+            @click.middle="imageSelectedIndex = index; window.open('/post/show/' + imageSelected.id)"
           >
             <template v-slot:placeholder>
               <v-row v-if="image.isRatingS||(image.isRatingQ && showRatingQ)||(image.isRatingE && showRatingE)"
@@ -614,62 +658,54 @@ div#paginator > div.pagination {
         <v-img
           :src="imageSelected.sampleUrl"
           :lazy-src="imageSelected.previewUrl"
-          @click="showImageInfo=!showImageInfo;"
+          @click="showImageInfo = !showImageInfo;"
         >
-          <div :style="showImageInfo ? '' : 'display: none !important;'" class="d-flex flex-column px-1">
-            <v-chip class="mt-1" style="width:fit-content;" color="#ee8888" text-color="#ffffff" small
-              v-text="'编号 ' + imageSelected.id" @click.stop
-            ></v-chip>
-            <v-chip class="mt-1" style="width:fit-content;" color="#ee8888" text-color="#ffffff" small
-              v-text="'分级 ' + imageSelected.rating.toUpperCase()" @click.stop
-            ></v-chip>
-            <v-chip class="mt-1" style="width:fit-content;" color="#ee8888" text-color="#ffffff" small
-              v-text="'评分 ' + imageSelected.score" @click.stop
-            ></v-chip>
-            <v-chip class="mt-1" style="width:fit-content;" color="#ee8888" text-color="#ffffff" small
-              v-text="'创建者 ' + imageSelected.author"
-              @click.stop="window.open('/user/show/' + imageSelected.creatorId)"
-            ></v-chip>
-            <v-chip class="mt-1" style="width:fit-content;" color="#ee8888" text-color="#ffffff" small
-              v-text="'创建时间 ' + imageSelected.createdTime"
-              @click.stop
-            ></v-chip>
-            <v-chip class="mt-1" style="width:fit-content;" color="#ee8888" text-color="#ffffff" small
-              v-text="'更新时间 ' + imageSelected.updatedTime"
-              @click.stop
-            ></v-chip>
-            <v-chip class="mt-1" style="width:fit-content;" color="#ee8888" text-color="#ffffff" small
-              v-if="imageSelected.sourceUrl !== ''"
-              v-text="'来源链接 ' + imageSelected.sourceUrl"
-              @click.stop="window.open(imageSelected.sourceUrl)"
-            ></v-chip>
-            <!-- https://oreno.imouto.us/post/show/785667 -->
-            <v-chip class="mt-1" style="width:fit-content;" color="#ee8888" text-color="#ffffff" small
-              v-text="'本站链接 ' + location.origin + '/post/show/' + imageSelected.id"
-              @click.stop="window.open('/post/show/' + imageSelected.id)"
-            ></v-chip>
-            <div style="height:1.25rem;"></div>
-            <!-- 下载三种格式的文件 -->
-            <v-chip class="mt-1" style="width:fit-content;" color="#ee8888" text-color="#ffffff" small
+          <div
+            :style="showImageInfo
+              ? 'display: flex; flex-direction: column; height: 100%; padding: 4px; grid-gap: 4px;'
+              : 'display: none !important;'"
+          >
+            <div style="height: 100%; flex: 1 1 auto;"></div>
+
+            <v-chip class="mt-1" style="width:fit-content;" color="#009ff088" text-color="#ffffff" small
               v-text="imageSelected.sampleDownloadText"
               @click.stop="download(imageSelected.sampleUrl, imageSelected.sampleDownloadName)"
             ></v-chip>
-            <v-chip class="mt-1" style="width:fit-content;" color="#ee8888" text-color="#ffffff" small
+            <v-chip class="mt-1" style="width:fit-content;" color="#009ff088" text-color="#ffffff" small
               v-if="imageSelected.jpegSize !== 0"
               v-text="imageSelected.jpegDownloadText"
               @click.stop="download(imageSelected.jpegUrl, imageSelected.jpegDownloadName)"
             ></v-chip>
-            <v-chip class="mt-1" style="width:fit-content;" color="#ee8888" text-color="#ffffff" small
+            <v-chip class="mt-1" style="width:fit-content;" color="#009ff088" text-color="#ffffff" small
               v-text="imageSelected.fileDownloadText"
               @click.stop="download(imageSelected.fileUrl, imageSelected.fileDownloadName)"
             ></v-chip>
+
+            <div style="display: flex; grid-gap: 4px;">
+              <v-chip
+                style="width:fit-content;" color="#ee888888" text-color="#ffffff" small
+                v-text="imageSelected.id + ' ' + imageSelected.rating.toUpperCase()" @click.stop
+              ></v-chip>
+              <v-chip class="mr-1" style="width:fit-content;" color="#009ff088" text-color="#ffffff" small
+                v-if="imageSelected.sourceUrl !== ''"
+                v-text="'来源链接'"
+                @click.stop="window.open(imageSelected.sourceUrl)"
+              ></v-chip>
+              <v-chip class="mr-1" style="width:fit-content;" color="#009ff088" text-color="#ffffff" small
+                v-text="'本站链接'"
+                @click.stop="window.open('/post/show/' + imageSelected.id)"
+              ></v-chip>
+              <v-chip class="mr-1" style="width:fit-content;" text-color="#ffffff" small
+                :color="imageSelected.favorite ? '#00900088' : '#009ff088'"
+                v-text="imageSelected.favorite ? '收藏成功' : '添加收藏'"
+                @click.stop="imageSelected.favorite ? (void 0) : onFavorite(imageSelected.id)"
+              ></v-chip>
+            </div>
           </div>
         </v-img>
-
       </v-dialog>
     </v-container>
   </v-main>
-
 </v-app>
 </script>
 `;
@@ -703,7 +739,6 @@ div#paginator > div.pagination {
     localStorage.setItem("showImageHD", JSON.stringify(index));
     console.log("showImageHD", index);
   };
-  const origin = window.location.origin;
   let taskArray = [];
   let maxLoadingSampleNum = 1;
   let doLoadSampleUrl = () => {
@@ -757,14 +792,7 @@ div#paginator > div.pagination {
         const id = RegExp.$1;
         const sampleUrl = samples[id];
         if (sampleUrl !== undefined) {
-          switch (origin) {
-            case 'https://oreno.imouto.us':
-              taskArray.push({ element, sampleUrl });
-              break;
-            default:
-              taskArray.push({ element, sampleUrl });
-              break;
-          }
+          taskArray.push({ element, sampleUrl });
         }
       }
     });
