@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Yande.re 简体中文
 // @namespace    com.coderzhaoziwei.yandere
-// @version      2.1.28
+// @version      2.1.42
 // @author       Coder Zhao coderzhaoziwei@outlook.com
 // @description  中文标签 | 界面优化 | 高清大图 | 键盘翻页 | 流体布局
 // @homepage     https://greasyfork.org/scripts/421970
@@ -16,7 +16,7 @@
 // @grant        GM_download
 // ==/UserScript==
 
-/* eslint-env es6 */
+/* eslint-env es2022 */
 /* global jQuery:readonly */
 /* global Vue:readonly */
 /* global Vuetify:readonly */
@@ -340,6 +340,13 @@ div#paginator > div.pagination {
       }
     },
     computed: {
+      isMobile() {
+        try {
+          return this.$vuetify.breakpoint.mobile
+        } catch(error) {
+          return false
+        }
+      },
       title() {
         return `${this.imageList.length} Posts`
       },
@@ -388,6 +395,7 @@ div#paginator > div.pagination {
           jQuery.get(url, data => resolve(data));
         });
         if (response instanceof Array && response.length > 0) {
+          window.history.pushState("", "", location.pathname + "?" + this.params.toString());
           response.forEach(item => this.imageList.push(new Post(item)));
           const page = Number(this.params.get("page")) || 1;
           this.params.set("page", page + 1);
@@ -397,7 +405,13 @@ div#paginator > div.pagination {
         }
       },
       download(src, filename) {
-        GM_download(src, filename);
+        const match = src.match(/[.](?<extension>png|jpg|jpeg)$/);
+        if (match) {
+          const extension = match.groups.extension;
+          GM_download(src, filename + "." + extension);
+        } else {
+          GM_download(src, filename);
+        }
       },
       onFavorite(id) {
         $.ajax({
@@ -466,22 +480,22 @@ div#paginator > div.pagination {
 <v-app>
 
   <v-app-bar app dense>
-    <v-app-bar-nav-icon @click="showDrawer=!showDrawer"></v-app-bar-nav-icon>
-    <v-toolbar-title v-text="title"></v-toolbar-title>
+    <v-app-bar-nav-icon :x-small="isMobile" @click="showDrawer=!showDrawer"></v-app-bar-nav-icon>
+    <v-toolbar-title :style="isMobile ? 'font-size: 12px;' : ''" v-text="title"></v-toolbar-title>
     <!-- 设置分级制度 -->
     <v-menu offset-y>
       <template v-slot:activator="{ on, attrs }">
-        <v-btn class="white--text ml-2" dark v-bind="attrs" v-on="on">
+        <v-btn :x-small="isMobile" class="white--text ml-2" dark v-bind="attrs" v-on="on">
           S{{ showRatingQ ? 'Q' : '' }}{{ showRatingE ? 'E' : '' }}
         </v-btn>
       </template>
       <v-list dense>
-        <v-list-item>
+        <v-list-item dense>
           <v-list-item-title style="cursor: pointer;" @click="showRatingQ = !showRatingQ;">
             {{ showRatingQ ? '隐藏 Q 级内容' : '显示 Q 级内容' }}
           </v-list-item-title>
         </v-list-item>
-        <v-list-item>
+        <v-list-item dense>
           <v-list-item-title style="cursor: pointer;" @click="showRatingE = !showRatingE;">
             {{ showRatingE ? '隐藏 E 级内容' : '显示 E 级内容' }}
           </v-list-item-title>
@@ -491,15 +505,15 @@ div#paginator > div.pagination {
     <!-- 设置图片质量 -->
     <v-menu offset-y>
       <template v-slot:activator="{ on, attrs }">
-        <v-btn class="white--text ml-2" dark v-bind="attrs" v-on="on">{{ imageQualityHigh ? '高清' : '速览' }}</v-btn>
+        <v-btn :x-small="isMobile" class="white--text ml-2" dark v-bind="attrs" v-on="on">{{ imageQualityHigh ? 'HD' : '速' }}</v-btn>
       </template>
       <v-list dense>
-        <v-list-item>
+        <v-list-item dense>
           <v-list-item-title style="cursor: pointer;" @click="imageQualityHigh = false;">
             图片质量：速览
           </v-list-item-title>
         </v-list-item>
-        <v-list-item>
+        <v-list-item dense>
           <v-list-item-title style="cursor: pointer;" @click="imageQualityHigh = true;">
             图片质量：高清
           </v-list-item-title>
@@ -509,19 +523,22 @@ div#paginator > div.pagination {
     <!-- 设置每行几张 -->
     <v-menu offset-y>
       <template v-slot:activator="{ on, attrs }">
-        <v-btn class="white--text ml-2" dark v-bind="attrs" v-on="on">每行 {{imageCountInRow}} 张</v-btn>
+        <v-btn :x-small="isMobile" class="white--text ml-2" dark v-bind="attrs" v-on="on">{{imageCountInRow}}列</v-btn>
       </template>
       <v-list dense>
-        <v-list-item v-for="number in [1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 20]" :key="number">
+        <v-list-item dense v-for="number in [1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 20]" :key="number">
           <v-list-item-title style="cursor: pointer;" @click="imageCountInRow = number;">
-            每行 {{ number }} 张
+            {{ number }}列
           </v-list-item-title>
         </v-list-item>
       </v-list>
     </v-menu>
 
     <v-spacer></v-spacer>
-    <v-btn text v-text="'version ' + version" color="#ffffff" disabled></v-btn>
+    <v-btn
+      :style="isMobile ? 'flex: 0 1 auto; overflow: hidden;' : ''" :x-small="isMobile"
+      text v-text="'v' + version" color="#ffffff" disabled>
+    </v-btn>
   </v-app-bar>
 
   <v-navigation-drawer v-model="showDrawer" app temporary>
@@ -667,35 +684,36 @@ div#paginator > div.pagination {
           >
             <div style="height: 100%; flex: 1 1 auto;"></div>
 
-            <v-chip class="mt-1" style="width:fit-content;" color="#009ff088" text-color="#ffffff" small
-              v-text="imageSelected.sampleDownloadText"
-              @click.stop="download(imageSelected.sampleUrl, imageSelected.sampleDownloadName)"
-            ></v-chip>
-            <v-chip class="mt-1" style="width:fit-content;" color="#009ff088" text-color="#ffffff" small
-              v-if="imageSelected.jpegSize !== 0"
-              v-text="imageSelected.jpegDownloadText"
-              @click.stop="download(imageSelected.jpegUrl, imageSelected.jpegDownloadName)"
-            ></v-chip>
-            <v-chip class="mt-1" style="width:fit-content;" color="#009ff088" text-color="#ffffff" small
-              v-text="imageSelected.fileDownloadText"
-              @click.stop="download(imageSelected.fileUrl, imageSelected.fileDownloadName)"
-            ></v-chip>
-
-            <div style="display: flex; grid-gap: 4px;">
+            <div style="display: flex; flex-direction: column; grid-gap: 4px;">
+              <v-chip style="width: fit-content;" color="#009ff088" text-color="#ffffff" small
+                v-text="imageSelected.sampleDownloadText"
+                @click.stop="download(imageSelected.sampleUrl, imageSelected.sampleDownloadName)"
+              ></v-chip>
+              <v-chip style="width: fit-content;" color="#009ff088" text-color="#ffffff" small
+                v-if="imageSelected.jpegSize !== 0"
+                v-text="imageSelected.jpegDownloadText"
+                @click.stop="download(imageSelected.jpegUrl, imageSelected.jpegDownloadName)"
+              ></v-chip>
+              <v-chip style="width: fit-content;" color="#009ff088" text-color="#ffffff" small
+                v-text="imageSelected.fileDownloadText"
+                @click.stop="download(imageSelected.fileUrl, imageSelected.fileDownloadName)"
+              ></v-chip>
+            </div>
+            <div style="display: flex; grid-gap: 4px; flex-wrap: wrap;">
               <v-chip
-                style="width:fit-content;" color="#ee888888" text-color="#ffffff" small
+                style="width: fit-content;" color="#ee888888" text-color="#ffffff" small
                 v-text="imageSelected.id + ' ' + imageSelected.rating.toUpperCase()" @click.stop
               ></v-chip>
-              <v-chip class="mr-1" style="width:fit-content;" color="#009ff088" text-color="#ffffff" small
+              <v-chip class="mr-1" style="width: fit-content;" color="#009ff088" text-color="#ffffff" small
                 v-if="imageSelected.sourceUrl !== ''"
                 v-text="'来源链接'"
                 @click.stop="window.open(imageSelected.sourceUrl)"
               ></v-chip>
-              <v-chip class="mr-1" style="width:fit-content;" color="#009ff088" text-color="#ffffff" small
+              <v-chip class="mr-1" style="width: fit-content;" color="#009ff088" text-color="#ffffff" small
                 v-text="'本站链接'"
                 @click.stop="window.open('/post/show/' + imageSelected.id)"
               ></v-chip>
-              <v-chip class="mr-1" style="width:fit-content;" text-color="#ffffff" small
+              <v-chip class="mr-1" style="width: fit-content;" text-color="#ffffff" small
                 :color="imageSelected.favorite ? '#00900088' : '#009ff088'"
                 v-text="imageSelected.favorite ? '收藏成功' : '添加收藏'"
                 @click.stop="imageSelected.favorite ? (void 0) : onFavorite(imageSelected.id)"

@@ -28,6 +28,13 @@ const App = {
     }
   },
   computed: {
+    isMobile() {
+      try {
+        return this.$vuetify.breakpoint.mobile
+      } catch(error) {
+        return false
+      }
+    },
     title() {
       return `${this.imageList.length} Posts`
     },
@@ -76,6 +83,7 @@ const App = {
         jQuery.get(url, data => resolve(data))
       })
       if (response instanceof Array && response.length > 0) {
+        window.history.pushState("", "", location.pathname + "?" + this.params.toString())
         response.forEach(item => this.imageList.push(new Post(item)))
         const page = Number(this.params.get("page")) || 1
         this.params.set("page", page + 1)
@@ -86,7 +94,14 @@ const App = {
       }
     },
     download(src, filename) {
-      GM_download(src, filename)
+      // 添加文件后缀
+      const match = src.match(/[.](?<extension>png|jpg|jpeg)$/)
+      if (match) {
+        const extension = match.groups.extension
+        GM_download(src, filename + "." + extension)
+      } else {
+        GM_download(src, filename)
+      }
     },
     // 添加收藏
     onFavorite(id) {
