@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Yande.re 简体中文
 // @namespace    com.coderzhaoziwei.yandere
-// @version      2.1.42
+// @version      2.1.47
 // @author       Coder Zhao coderzhaoziwei@outlook.com
 // @description  中文标签 | 界面优化 | 高清大图 | 键盘翻页 | 流体布局
 // @homepage     https://greasyfork.org/scripts/421970
@@ -477,6 +477,10 @@
     initHotKey();
     initOptions();
     initTranslate();
+    if (document.cookie.includes('locale=zh_CN') === false) {
+      document.cookie = "locale=zh_CN";
+      location.href = location.href;
+    }
   });
 
 }());
